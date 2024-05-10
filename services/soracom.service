@@ -1,0 +1,14 @@
+[Unit]
+Description=Soracom Service
+After=gmulti-user.target
+
+[Service]
+WorkingDirectory=/home/pi/python
+ExecStart=/usr/bin/python3 /home/pi/python/soracom.py
+Type=idle
+User=pi
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
