@@ -17,6 +17,9 @@ for service in "${services[@]}"; do
         continue
     fi
 
+    # Reload the systemd daemon to recognize new services
+    systemctl daemon-reload
+
     # Enable and start the services.
     if systemctl enable "$service"; then
         echo "$service enabled successfully"
@@ -31,6 +34,3 @@ for service in "${services[@]}"; do
         echo "Failed to start $service"
     fi
 done
-
-# Reload the systemd daemon.
-systemctl daemon-reload
