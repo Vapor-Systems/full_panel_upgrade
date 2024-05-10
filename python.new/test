@@ -1,0 +1,3 @@
+            print(xy(col,row+10), f"{kf}Test Mode........: {vf}{cont['test_mode']}",end=term)
+            print(xy(col,row+11), f"{kf}  Test High Limit: {vf}{cont['rc_high_limit']}",end=term)
+            print(xy(col,row+12), f"{kf}  Test Low Limit.: {vf}{cont['rc_low_limit']}",end=term)

@@ -1,0 +1,5 @@
+#!/usr/bin/python3
+
+with open('/home/pi/python/vst_debug', 'w') as outfile:
+    outfile.write("DEBUGGING=True")
+                

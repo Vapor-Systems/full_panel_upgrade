@@ -1,0 +1,3 @@
+### VERSION FILE CONTROL PROGRAM ###
+secrets = {"DEBUGGING" : False, "DEVICE_NAME" : "CSX-3063", "BUILD" : "100.141", "VERSION" : "CSX-002H" }
+
