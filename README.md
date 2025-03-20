@@ -46,12 +46,21 @@
     git clone https://github.com/Vapor-Systems/full_panel_upgrade
     ```
 
-4. Once that completes enter the following command and hit enter:
+4. Once that completes enter the following commands and hit enter after each one:
 	```bash
+    cd full_panel_upgrade
     python3 updater.py
     ```
 
 5. You will be prompted for a device name, run cycle count, and profile. Type each one in and hit enter, ensuring that you've typed it in correctly.
+
+### Final Steps:
+
+1. Head back to your VNC window and ensure the version is now **`L`**, the device is **`Unlocked`**, and *`run cycle count`*, *`profile`*, and *`device name`* all appear as intended.
+
+2. **Update Soracom Information**: Make necessary updates to Soracom device details to reflect the H version and change Speed Class back to slow.
+
+3. **Update Zoho Information**: Update Zoho entry for device.
 
 ### Final Steps:
 
