@@ -55,7 +55,7 @@
 
 ### Final Steps:
 
-1. Head back to your VNC window and ensure the version is now **`H`**, the device is **`Unlocked`**, and *`run cycle count`*, *`profile`*, and *`device name`* all appear as intended.
+1. Head back to your VNC window and ensure the version is now **`L`**, the device is **`Unlocked`**, and *`run cycle count`*, *`profile`*, and *`device name`* all appear as intended.
 
 2. **Update Soracom Information**: Make necessary updates to Soracom device details to reflect the H version and change Speed Class back to slow.
 
