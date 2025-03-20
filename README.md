@@ -1,6 +1,6 @@
 # Smart Panel Full Upgrade Procedure
 
-*This document outlines the steps required to update the control panel in a Comfile device, from **any version** to **H**. 
+*This document outlines the steps required to update the control panel in a Comfile device, from **any version** to **L**. 
 
 ### Get Device Information:
 
