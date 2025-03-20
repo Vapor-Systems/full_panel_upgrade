@@ -184,11 +184,9 @@ def main():
         print(xy(col,row+11), f"{kf}MIN Current...: {vf}{curr_min}",end=term)
         print(xy(col,row+12), f"{kf}MAX Current...: {vf}{curr_max}",end=term)
         print(xy(col,row+13), f"{kf}ADC Chan 0....: {vf}{cont['adc_value']} ",end=term)
-        
-        print(xy(col,row+14), f"{kf}ADC Zero  ....: {vf}{cont['adc_zero']} ",end=term)
-        print(xy(col,row+15), f"{kf}ADC Chan 2....: {vf}{cont['adc_current_chan_2']} ",end=term)
-        print(xy(col,row+16), f"{kf}ADC Chan 3....: {vf}{cont['adc_current_chan_3']} ",end=term)
-        print(xy(col,row+17), f"{kf}ADC Abs(2-3)..: {vf}{cont['adc_current_abs']}    ",end=term)
+        print(xy(col,row+14), f"{kf}ADC Chan 2....: {vf}{cont['adc_current_chan_2']} ",end=term)
+        print(xy(col,row+15), f"{kf}ADC Chan 3....: {vf}{cont['adc_current_chan_3']} ",end=term)
+        print(xy(col,row+16), f"{kf}ADC Abs(2-3)..: {vf}{cont['adc_current_abs']}    ",end=term)
         
             
         curr_max = max(curr_max, cont['current'])
@@ -272,11 +270,11 @@ def main():
 
 
         
-        print(xy(5,row+18), f"{rf}______________________________________________________________________________________",end=term)
+        print(xy(5,row+17), f"{rf}______________________________________________________________________________________",end=term)
         
         
-        print(xy(0   ,row+19), f"{kf}Payload:",end='')
-        print(xy(0   ,row+20),  f"{vf}{payload}    ",end=term)
+        print(xy(0   ,row+18), f"{kf}Payload:",end='')
+        print(xy(0   ,row+19),  f"{vf}{payload}    ",end=term)
 
 
         try: mode
@@ -285,7 +283,7 @@ def main():
         try: step
         except NameError: step = 0
             
-        y = row +22
+        y = row +21
             
         old_mode = mode
    

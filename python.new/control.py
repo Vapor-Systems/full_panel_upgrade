@@ -10,7 +10,7 @@ Special Note: This version of control can read hydrocarbons.  Just set the HYDRO
 
 '''
 
-BUILD = '100.141'
+BUILD = '100.149'
 DEBUGGING = False
 SAVING = False # Added for Saver.py interfaceing 
 HYDROCARBONS = False #IF True, records Hydrocarbons with the current sensor input and outputs via Lat/Lon outputs
@@ -19,6 +19,14 @@ SHORT_TIME_THRESHOLD = 1 #sec
 FAST_TIME_THRESHOLD = 0.03 #30 ms
 LOW_CURRENT_THRESHOLD = 3.0 #amps
 LOW_PRESSURE_THRESHOLD = -25.0 #iwc
+LOW_CURRENT_COUNTER = 9 
+
+# Changes for K, ver 143
+HIGH_CURRENT_THRESHOLD = 20.0 #amps
+HIGH_CURRENT_COUNT = 2 #2 seconds
+HIGH_CURRENT_COOLDOWN = 2 #2 seconds
+HIGH_CURRENT_COUNTER = 2  ##  Changed from 9 for testing
+
 
 import sys
 
@@ -335,6 +343,15 @@ cont['adc_value_hc'] = 0.0
 cont['curr_counter'] = 0
 cont['calibration'] = 0
 
+# new variables for rev K, 143
+cont['curr_max_count'] = 99999999999
+cont['curr_max_flag'] = False
+
+cont['curr_max_time'] = 0
+cont['curr_cool_time'] = 0
+cont['curr_max_threshold'] = False
+cont['curr_max_hold'] = False
+
 
 # def save_controller():
 #     rconn.set("cont",json.dumps(cont))
@@ -370,7 +387,7 @@ alarms['buzzer_var'] = True
 alarms['buzzer_triggered'] = False
 alarms['buzzer_silenced'] = False
 alarms['buzzer_deferred'] = False
-
+alarms['gm_fault_buzzer_trigger'] = True
 alarms['tls_buzzer_triggered'] = False
 
 alarms['buzzer_delay'] = 0
@@ -707,7 +724,7 @@ def buzzer(freq, dur):
     
 def beep():
 
-    if BUZZER and (profile == 'CS8' or profile == 'CS12') :
+    if BUZZER and (profile == 'CS8' or profile == 'CS12' or profile == 'CS9') :
         
         freq = 880
         dur = 0.5
@@ -737,7 +754,7 @@ def panel_power_relay_active():
         pp_relay = panel_power.value
 
     except:
-        logging.error("PANEL POWER Relay not reporting!")
+        logging.error(f"PANEL POWER Relay not reporting!")
         alarms['maint_alarm'] = False
 
     else:
@@ -776,14 +793,14 @@ def relay_on(r):
 
     time.sleep(0.01)  ### Added in Rev 140 for i2c Timing Issues.
     
-    logging.info(f'## Relay {r}: Attempting to set to ON')
+    #logging.info(f'## Relay {r}: Attempting to set to ON')
 
     try:
         mcp.get_pin(r).value = True
     
     except:
         pin_error += 1
-        logging.error(f'!! I2C Error reading relay {r} while attempting to set to ON')  
+        logging.error(f'!! I2C ERROR reading relay {r} while attempting to set to ON')  
    
     else:   
     
@@ -793,16 +810,16 @@ def relay_on(r):
             
         except:
             pin_error +=1
-            logging.error(f'!! I2C Error reading relay {r} after attempting to set to ON.')
+            logging.error(f'!! I2C ERROR reading relay {r} after attempting to set to ON.')
             
         else:
             if r_value != True:
                 pin_error +=1
-                logging.error(f'!! I2C Error verifying relay {r}.  Set to ON but read OFF.')
+                logging.error(f'!! I2C ERROR verifying relay {r}.  Set to ON but read OFF.')
                 
             else:
             
-                logging.info(f'## Successfully set relay {r} to ON.')
+                #logging.info(f'## Successfully set relay {r} to ON.')
                 cont['relay'][r] = r_value
                 pin_error = 0
             
@@ -831,7 +848,7 @@ def relay_off(r):
     
     time.sleep(0.01)  ### Added in Rev 140 for i2c Timing Issues.
 
-    logging.info(f'## Relay {r}: Attempting to set to OFF')
+    #logging.info(f'## Relay {r}: Attempting to set to OFF')
 
     try:
     
@@ -840,7 +857,7 @@ def relay_off(r):
     
     except:
         pin_error += 1
-        logging.error(f'!! I2C Error reading relay {r} while attempting to set to OFF')  
+        logging.error(f'!! I2C ERROR reading relay {r} while attempting to set to OFF')  
    
     else:   
     
@@ -849,16 +866,16 @@ def relay_off(r):
             
         except:
             pin_error += 1
-            logging.error(f'!! I2C Error reading relay {r} after attempting to set to OFF.')
+            logging.error(f'!! I2C ERROR reading relay {r} after attempting to set to OFF.')
             
         else:
             if r_value != False:
                 pin_error += 1
-                logging.error(f'!! I2C Error verifying relay {r}.  Set to OFF but read ON.')
+                logging.error(f'!! I2C ERROR verifying relay {r}.  Set to OFF but read ON.')
                 
             else:
             
-                logging.info(f'## Successfully set relay {r} to OFF.')
+                #logging.info(f'## Successfully set relay {r} to OFF.')
                 cont['relay'][r] = r_value
                 pin_error = 0
             
@@ -1227,7 +1244,41 @@ def save_restart(run_cyc, run_step, run_timer, run_mode):
     else:
         restart['run_cyc'] = "false"
 
+
+        
+    print(f"##### SAVING#2  Restart: Run_Cyc: {run_cyc}, Run_Step: {run_step}, Run Timer: {run_timer}, Run Mode: {run_mode}")
+
     with open('/home/pi/python/restart.json', 'w') as outfile:
+        json.dump(restart, outfile)
+
+
+def save_restart2(run_cyc, run_step, run_timer, run_mode):
+
+    '''
+    This Function saves a restart condition so that it can be restarted
+    when the program restarts.
+    '''
+
+    # global run_cyc
+    # global run_step
+    # global run_time
+    # global run_mode
+
+    restart = {}
+    restart['run_mode'] = run_mode
+    restart['run_step'] = run_step
+    restart['run_timer'] = run_timer
+
+    if run_cyc:
+        restart['run_cyc'] = "true"
+    else:
+        restart['run_cyc'] = "false"
+
+
+        
+    print(f"##### SAVING#2  Restart: Run_Cyc: {run_cyc}, Run_Step: {run_step}, Run Timer: {run_timer}, Run Mode: {run_mode}")
+
+    with open('/home/pi/python/restart2.json', 'w') as outfile:
         json.dump(restart, outfile)
 
 
@@ -1237,10 +1288,10 @@ def get_restart():
     This function should restart a runcycle mid-way
     '''
 
-    # global run_cyc
-    # global run_step
-    # global run_timer
-    # global run_mode
+    #global run_cyc
+    #global run_step
+    #global run_timer
+    #global run_mode
 
     try:
         with open('/home/pi/python/restart.json') as in_file:
@@ -1252,15 +1303,41 @@ def get_restart():
     else:
 
         run_mode = restart['run_mode']
+        run_cyc = True if restart['run_cyc'] == "true" else False
+        run_step = restart['run_step']
+        run_timer = restart['run_timer'] + HIGH_CURRENT_COOLDOWN  ## add the tiem back.
+            
+    return run_cyc, run_step, run_timer, run_mode
+        
+        #os.remove("/home/pi/python/restart.json")
+  
+    #### At the end of this the parameters that define a runcycle should
+    #### re-invoke the previous runcycle
 
-        if run_mode == "run":
-            run_cyc = True if restart['run_cyc'] == "true" else False
-            run_step = restart['run_step']
-            run_timer = restart['run_timer']
-        else:
-            run_cyc = False
-            run_step = 0 
-            run_timer = 0
+def get_restart2():
+
+    '''
+    This function should restart a runcycle mid-way
+    '''
+
+    #global run_cyc
+    #global run_step
+    #global run_timer
+    #global run_mode
+
+    try:
+        with open('/home/pi/python/restart2.json') as in_file:
+            restart = json.load(in_file)
+    except:
+        save_restart(0,0,0,0)        
+        all_stop()
+    
+    else:
+
+        run_mode = restart['run_mode']
+        run_cyc = True if restart['run_cyc'] == "true" else False
+        run_step = restart['run_step']
+        run_timer = restart['run_timer'] + HIGH_CURRENT_COOLDOWN  ## add the tiem back.
             
     return run_cyc, run_step, run_timer, run_mode
         
@@ -1360,7 +1437,7 @@ def get_current():
         #adc.close()
       
     except:
-        logging.error("Cannot read current from Vac Pump Motor!")
+        logging.error(f"Cannot read current from Vac Pump Motor!")
 
     else:
         i = abs(c-d)
@@ -1385,14 +1462,14 @@ def get_current():
         cont['current'] = round(cont['curr_rms'],2)
 
 
-def check_current(i):
+def check_low_current(i):
 
     global alarms
     global cont
 
     if i <= LOW_CURRENT_THRESHOLD:
 
-        if cont['curr_counter'] >= 9:
+        if cont['curr_counter'] >= LOW_CURRENT_COUNTER:
             alarms['vac_pump_alarm'] = True
             all_stop() 
             set_screen('a')
@@ -1400,7 +1477,7 @@ def check_current(i):
             if alarms['critical_alarm_time'] ==0:
                 alarms['critical_alarm_time'] = time.time()
 
-            logging.error("Critical Alarm - Vac Pump.  Current: {i} below {LOW_CURRENT_THRESHOLD}!")
+            logging.error(f"Critical Alarm - Vac Pump.  Current: {i} below {LOW_CURRENT_THRESHOLD}!")
 
         else:
             cont['curr_counter'] = cont['curr_counter'] + 1
@@ -1414,6 +1491,113 @@ def check_current(i):
     save_controller(cont)
 
 
+
+def check_high_current(i):
+
+    global alarms
+    global cont
+    
+    global run_cyc
+    global run_step
+    global run_timer
+    global run_mode
+
+    ### New for Rev K - 143, If current is too high for to long, stop the current run and start over
+
+    if cont['curr_max_threshold']:
+        print(f"Cooldown: {time.time()-cont['curr_max_time']}")
+
+    if cont['curr_max_threshold'] and ((time.time() - cont['curr_max_time']) > HIGH_CURRENT_COOLDOWN):
+    
+        print(f"**** Inside Cooldown.  Current Cooldown Time: {cont['curr_max_time']} ")
+        print(f"***** Current Max Count: {cont['curr_max_count']}")
+        print(f"***** Current Max Threshold: {cont['curr_max_threshold']}")
+        print(f"***** Current Cool Time: {cont['curr_cool_time']}")
+        
+
+        #  restart existing run cycle after cooldown
+
+        run_cyc, run_step, run_timer, run_mode = get_restart2()
+        
+        print(f"##### Got Restart: Run_Cyc: {run_cyc}, Run_Step: {run_step}, Run Timer: {run_timer}, Run Mode: {run_mode}")
+
+        cont['curr_max_threshold'] = False  ## this should be changed?
+        cont['curr_max_count'] = time.time()
+        cont['curr_cool_time'] = 0
+        cont['curr_max_flag'] = False
+        cont['curr_max_hold'] = False ## Resume one_second_update functioning after cooldown 
+
+        logging.info(f"Restarting interrupted cycle {run_mode} @ step {run_step}.")
+
+    elif i >= HIGH_CURRENT_THRESHOLD: 
+     
+        if not cont['curr_max_flag']:
+            cont['curr_max_count']= time.time()
+            cont['curr_max_flag'] = True
+            
+        if not cont['curr_max_threshold'] and (time.time() - cont['curr_max_count']) >= HIGH_CURRENT_COUNT:
+        
+            print(f"**** High Current Detected.  Current Max Count: {cont['curr_max_count']}")
+            print(f"**** Current Max Time: {cont['curr_max_time']} ")
+            print(f"**** Current Max Threshold: {cont['curr_max_threshold']}")
+            print(f"**** Current Cool Time: {cont['curr_cool_time']}")
+            
+        
+            #if not cont['curr_max_threshold'] and cont['curr_max_count'] >= HIGH_CURRENT_COUNT:
+            logging.error(f"Shenyang Current @ {i} amps for {cont['curr_max_count']}. Shutting motor down momentarily.")
+
+            # Retain what step of the cycle we are on
+            # Stop everything
+            # give a cool down period of x number of seconds
+            # restart the cycle where we left off
+            # resume monitoring
+            
+            cont['curr_max_time'] = time.time()
+            #cont['curr_max_count'] = time.time()
+            cont['curr_max_count'] = time.time()
+            
+
+            print(f"##### SAVING Restart: Run_Cyc: {run_cyc}, Run_Step: {run_step}, Run Timer: {run_timer}, Run Mode: {run_mode}")
+            cont['curr_max_hold'] = True  ## Keep one_secon_update from functioning during cooldown 
+            save_restart2(run_cyc, run_step, run_timer, run_mode)
+
+            if cont['curr_counter'] >= HIGH_CURRENT_COUNTER:
+            
+                alarms['vac_pump_alarm'] = True
+                all_stop()
+                set_screen('a')
+
+                if alarms['critical_alarm_time'] == 0:
+                    alarms['critical_alarm_time'] = time.time()
+
+                logging.error(f"Critical Alarm - Vac Pump.  Current: {i} above {HIGH_CURRENT_THRESHOLD}!")
+
+            else:
+                cont['curr_counter'] = cont['curr_counter'] + 1
+
+            ### end of change
+
+            #cont['curr_counter'] = cont['curr_counter'] + 1 #increment REAL current counter
+
+            cont['curr_max_threshold'] = True
+
+            all_stop()  # This stops and resets all the run information
+
+            cont['curr_cool_time'] = time.time()
+
+        else:
+            # This is where we track how long the motor is over its max current
+            print(f"Time at high Current: {time.time() - cont['curr_max_count']}")
+            #cont['curr_max_count'] += 1
+            # cont['curr_max_count'] = time.time()
+            # cont['curr_counter'] = 0
+
+    save_controller(cont)
+
+
+
+
+
 def get_pressure():
 
     global cont
@@ -1423,6 +1607,7 @@ def get_pressure():
 
     try:      
         cont['adc_value'] = adc.read_adc(0, gain=GAIN)
+        #cont['adc_value'] = 16000
 
     except:
     
@@ -1435,7 +1620,7 @@ def get_pressure():
                 window['sb'].update(visible=True)
                 window.read(timeout=1)
 
-        logging.error("Critical Alarm - Pressure Sensor - Sensor not found")
+        logging.error(f"Critical Alarm - Pressure Sensor - Sensor not found")
 
         print(f'################################')   
         print(f'## Pressure sensor not found')
@@ -1444,6 +1629,7 @@ def get_pressure():
         all_stop()
 
         pressure = -99.9   ### arbitrary value to indicate pressure sensor is broken
+        cont['pressure'] = pressure
 
     else:
     
@@ -1452,7 +1638,7 @@ def get_pressure():
         '''
         
         if cont['adc_value'] < 1:
-            logging.error("ritical Alarm - Pressure Sensor - Sensor BROKEN")
+            logging.error(f"Critical Alarm - Pressure Sensor - Sensor BROKEN")
 
             print(f'################################')   
             print(f'## Pressure sensor broken')
@@ -1467,6 +1653,7 @@ def get_pressure():
                     window.read(timeout=1)
 
             pressure = -99.8
+            cont['pressure'] = pressure
             all_stop()            
       
         else:
@@ -1514,7 +1701,7 @@ def get_hydrocarbons():
              
     except:
 
-        logging.error("Critical Alarm - Hydrocarbon Sensor - Sensor BROKEN")
+        logging.error(f"Critical Alarm - Hydrocarbon Sensor - Sensor BROKEN")
 
         if DEBUGGING:
 
@@ -1563,7 +1750,7 @@ def pressure_sensor_alarm(pressure):
     if (pressure < -40.0) or (cont['adc_value'] < 1):
         alarms['press_sensor_alarm'] = True
 
-        logging.error("Critical Alarm - Pressure Sensor - Sensor BROKEN")
+        logging.error(f"Critical Alarm - Pressure Sensor - Sensor BROKEN")
 
         if profile == 'CS8':
             if alarms['buzzer_silenced'] == False:
@@ -1582,7 +1769,7 @@ def pressure_sensor_alarm(pressure):
     if alarms['press_sensor_alarm'] is True:
         if not alarms['all_stop']:
             all_stop()
-            logging.error("Another pressure Sensor alarm")
+            logging.error(f"Another pressure Sensor alarm")
 
         if profile == 'CS8':
             if alarms['buzzer_silenced'] == False:
@@ -1714,7 +1901,7 @@ def check_overfill():
 
                 if DEBUGGING:
 
-                    logging.error('TLS Relay - Overfill Alarm')
+                    logging.error(f"TLS Relay - Overfill Alarm")
 
                     print(f'################################')    
                     print(f'## Error - OVERFILL!          ##')
@@ -1767,12 +1954,14 @@ def fast_updates():
     if HYDROCARBONS:
         get_hydrocarbons()
     
+    check_high_current(cont['current'])
+    
     if run_cyc is True \
         and cont['mode']== 2 \
         and time.time()-run_timer >= 35 \
         and cont['vac_pump_alarm_checked'] is False:
 
-        check_current(cont['current'])
+        check_low_current(cont['current'])
         cont['vac_pump_alarm_checked'] = True
 
         logging.info(f"Current: {cont['current']}")
@@ -1891,7 +2080,7 @@ def one_sec_updates():
     cont2 = load_controller()
 
     if alarms['sd_card_alarm']:
-        logging.error("USB Flash media not found.")
+        logging.error(f"USB Flash media not found.")
         #beep()
 
         if profile == 'CS8': 
@@ -1975,6 +2164,11 @@ def one_sec_updates():
         var_pressure_alarm(cont['pressure'])
 
         alarms = check_alarms(alarms)
+        
+    elif profile == 'CS9':
+    
+        alarms = check_alarms(alarms)
+        
 
     cont['faults'] = create_faultcode(alarms)
 
@@ -1984,7 +2178,9 @@ def one_sec_updates():
 
     critical = critical_alarm()
 
-    if not critical and cont["pressure"] > LOW_PRESSURE_THRESHOLD:
+    if not cont['curr_max_hold'] and not critical and cont['pressure'] > LOW_PRESSURE_THRESHOLD:
+
+    #if not critical and cont["pressure"] > LOW_PRESSURE_THRESHOLD:
 
         if run_cyc:   
         
@@ -2000,6 +2196,12 @@ def one_sec_updates():
             print(f'Step: {bcolors.HEADER}{run_step}{bcolors.ENDC}', end = ' ')
             print(f'Duration: {bcolors.HEADER}{step_time}{bcolors.ENDC}', end = ' ') 
             print(f'Elapsed: {bcolors.HEADER}{accum_time}{bcolors.ENDC}')
+
+            print(f"run_cyc: {bcolors.OKBLUE}{run_cyc}{bcolors.ENDC}", end = ' ')
+            print(f"run_step: {bcolors.OKBLUE}{run_step}{bcolors.ENDC}", end = ' ')
+            print(f"run_timer: {bcolors.OKBLUE}{int(time.time()-run_timer)}{bcolors.ENDC}", end = ' ')
+            print(f"run_mode: {bcolors.OKBLUE}{run_mode}{bcolors.ENDC}")
+
             print(f'Mode: {bcolors.HEADER}{cont["mode"]}{bcolors.ENDC}', end = ' ') 
             print(f'Pressure: {bcolors.HEADER}{cont["pressure"]}{bcolors.ENDC}', end = ' ') 
             print(f'Current: {bcolors.HEADER}{cont["current"]}{bcolors.ENDC}', end = ' ') 
@@ -2032,7 +2234,7 @@ def one_sec_updates():
             if 'curr_counter' not in cont:
                 cont['curr_counter'] = 0
 
-            logging.info(f'Run Mode: {run_mode}, Relay Mode: {cur_mode}, Run Step: {run_step}, Runcycle: {run_cyc}')
+            #logging.info(f'Run Mode: {run_mode}, Relay Mode: {cur_mode}, Run Step: {run_step}, Runcycle: {run_cyc}')
             set_relays(cur_mode)
             
             if time.time() - run_timer > step_time:
@@ -2120,7 +2322,7 @@ def one_sec_updates():
 
 
     ### Save date for interupted run - 10/31/2023
-    save_restart(run_cyc, run_step, run_timer, run_mode)
+    #save_restart(run_cyc, run_step, run_timer, run_mode)
 
     ##  Added 2022-08-21 to save controller condition to redis on every pass
 
@@ -2323,6 +2525,30 @@ def check_alarms(alarms):
                 
                 logging.info("Shutdown Timer started")
                 print("Shutdown Timer started") if DEBUGGING else ""
+
+    elif profile == "CS9":
+
+    	## New Rev J/K - if there is a pressure sensor alarm then set the dispenser relay false
+    	## Trigger a gm_fault at the TLS
+    	
+  
+        if ((alarms['press_sensor_alarm'] is True) or (alarms['vac_pump_alarm'] is True)):
+            dispenser_shutdown.value = False
+            logging.error(f"CRITICAL ERROR - GM Fault")
+
+            if alarms['gm_fault_buzzer_trigger']:
+                alarms['buzzer_silenced'] = False
+                alarms['gm_fault_buzzer_trigger'] = False            
+            
+            if alarms['buzzer_silenced'] == False:
+                window['sb'].update(visible=True)
+                window.read(timeout=1)
+                one_beep()
+
+        else:
+            dispenser_shutdown.value = True
+            alarms['gm_fault_buzzer_trigger'] = True
+            
 
     else:
 
@@ -3571,10 +3797,13 @@ def main():
         event, values = window.read(timeout=10)
 
         window['eff_time'].update(accum_time)
-
-        alarms2= json.loads(rconn.get("alarms"))
-        alarms['sd_card_alarm'] = alarms2['sd_card_alarm']
-
+        
+        try:
+            alarms2= json.loads(rconn.get("alarms"))
+            alarms['sd_card_alarm'] = alarms2['sd_card_alarm']
+        except:
+            pass
+            
         if event != "__TIMEOUT__":
             pass
         
@@ -4420,7 +4649,7 @@ def main():
 
                                 ### TURN OFF DISPENSERS
                                 dispenser_shutdown.value = False
-                                logging.error("CRITICAL ERROR - Dispenser Shutdown")
+                                logging.error(f"CRITICAL ERROR - Dispenser Shutdown")
                                 
                                 ### !!! VERIFY DISPENSER RELAY NORMALLY OPEN / CLOSE
 
@@ -4446,7 +4675,7 @@ def main():
                             
                                 window.read(timeout=1)
 
-                                logging.error("CRITICAL ERROR - Dispenser Will Shutdown!")
+                                logging.error(f"CRITICAL ERROR - Dispenser Will Shutdown!")
 
                                 #print(f"SHUTDONW ALARM #1 - Station WILL SHUT DOWN!")
                                 
@@ -4468,7 +4697,7 @@ def main():
                                 '''Just moved from one level up'''
 
                                 #print(f"SHUTDONW ALARM #2 - Station WILL SHUT DOWN!")
-                                logging.error("CRITICAL ERROR - Dispenser Will Shutdown!")
+                                logging.error(f"CRITICAL ERROR - Dispenser Will Shutdown!")
 
                                 window['main_status'].update('SHUTDOWN IMMINENT')
                                 window['main_status'].update(background_color='red')
@@ -4505,7 +4734,7 @@ def main():
                                     alarms['shutdown_time_60'] = 0
                                     
                                     #print(f"24 Hour SHUTDONW ALARM  #{shutdown_count} - Station is going to SHUT DOWN!")
-                                    logging.error("CRITICAL ERROR - Dispenser Will Shutdown!")
+                                    logging.error(f"CRITICAL ERROR - Dispenser Will Shutdown!")
 
                                     shutdown_count = shutdown_count + 1
 
@@ -4666,7 +4895,7 @@ if __name__ == '__main__':
     
     except:
     
-        logging.error("Modem Not Found on Startup")
+        logging.error(f"Modem Not Found on Startup")
 
     else:
 

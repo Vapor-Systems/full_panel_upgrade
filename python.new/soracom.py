@@ -285,30 +285,27 @@ def main():
     else:
         DEBUGGING = cont['debugging']
 
-    try:
-        modem = get_modem()
-        this_time = get_time()
+    modem = get_modem()
+    this_time = get_time()
 
-        rconn.set("modem",json.dumps(modem))
-        rconn.set('time',json.dumps(this_time))
+    rconn.set("modem",json.dumps(modem))
+    rconn.set('time',json.dumps(this_time))
 
-        signal_quality = modem['modem']['generic']['signal-quality']['value']
-        access_tech = modem['modem']['generic']['access-technologies'][0]
-        power_state = modem['modem']['generic']['power-state']
-        state = modem['modem']['generic']['state']
-        imei = modem['modem']['3gpp']['imei']
-        tm = this_time['modem']['time']['current']
-        
-        print(f'Access Tech: {access_tech}')
-        print(f'Power State: {power_state}')
-        print(f'State: {state}')
-        print(f'Signal Quality: {signal_quality}')
-        print(f'Current Time: {tm}')
-        print(f'IMEI: {imei}')
-    except:
-        logging.error(f"Modem not functioning!")
-        
-    transmit_duration = 60
+    signal_quality = modem['modem']['generic']['signal-quality']['value']
+    access_tech = modem['modem']['generic']['access-technologies'][0]
+    power_state = modem['modem']['generic']['power-state']
+    state = modem['modem']['generic']['state']
+    imei = modem['modem']['3gpp']['imei']
+    tm = this_time['modem']['time']['current']
+    
+    print(f'Access Tech: {access_tech}')
+    print(f'Power State: {power_state}')
+    print(f'State: {state}')
+    print(f'Signal Quality: {signal_quality}')
+    print(f'Current Time: {tm}')
+    print(f'IMEI: {imei}')
+
+    transmit_duration = 15
     save_duration = 15
         
     save_time = time.time()

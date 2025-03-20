@@ -1,13 +1,5 @@
 Patch Notes:
 
-2025-1-21 = CSX-002K (149)
-
-	- added a fix to mitigate the Shenyang motor problem and add
-	  appropriate logging to track its progrress. 
-	- added a proper restar of the cycle after stopping the motor or
-	  restarting.
-	- modified the logging to not spam with valve on/off condiitions.
-
 2024-08-14 - CSX-002J (142)
 
 	- added a change to CS9 allowing a pressure sensor fault to trigger the
