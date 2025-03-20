@@ -4,17 +4,17 @@ Configuration Update Tool
 
 This script performs a complete update of the system:
 1. Updates configuration values:
-    - Device name in vst_secrets.py
-    - Run cycle count in runcycles.json
-    - Profile in profile.json
-    - RPI serial number (last 6 digits) in startup.json
+   - Device name in vst_secrets.py
+   - Run cycle count in runcycles.json
+   - Profile in profile.json
+   - RPI serial number (last 6 digits) in startup.json
 2. Performs system operations:
-    - Removes backup directory
-    - Copies log file
-    - Stops control service
-    - Backs up current Python directory
-    - Moves new code into place
-    - Updates and starts system services
+   - Removes backup directory
+   - Copies log file
+   - Stops control service
+   - Backs up current Python directory
+   - Moves new code into place
+   - Updates and starts system services
 """
 
 import os
@@ -305,6 +305,16 @@ def perform_system_update() -> bool:
             "description": "Moving new code into place",
             "command": "mv python.new /home/pi/python",
             "sudo": False
+        },
+        {
+            "description": "Truncating first log file",
+            "command": "truncate -s 0 /home/pi/python/cp2.log",
+            "sudo": False
+        },
+        {
+            "description": "Truncating second log file",
+            "command": "truncate -s 0 /home/pi/python/cp2.log",
+            "sudo": False
         }
     ]
     
@@ -395,8 +405,9 @@ def main():
     print("3. Stop control service")
     print("4. Backup current Python directory")
     print("5. Move new code into place")
-    print("6. Update system services")
-    print("7. Start control service")
+    print("6. Truncate log files")
+    print("7. Update system services")
+    print("8. Start control service")
     
     proceed = input("\nDo you want to proceed with system update? (y/n): ")
     if proceed.lower() != 'y':
