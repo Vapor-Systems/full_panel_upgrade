@@ -15,6 +15,10 @@ This script performs a complete update of the system:
    - Backs up current Python directory
    - Moves new code into place
    - Updates and starts system services
+3. Updates boot configuration:
+   - Modifies /boot/config.txt to set USB parameters
+   - Comments out dwc2 host mode
+   - Adds otg_mode and USB power settings
 """
 
 import os
@@ -210,6 +214,97 @@ def get_rpi_serial() -> Tuple[bool, str]:
     last_six = full_serial[-6:].upper()
     
     return True, last_six
+
+
+def update_boot_config() -> bool:
+    """
+    Update the boot configuration in /boot/config.txt:
+    - Comment out 'dtoverlay=dwc2,dr_mode=host'
+    - Add 'otg_mode=1'
+    - Add USB power parameters
+    
+    Returns:
+        bool: True if the update was successful, False otherwise
+    """
+    config_path = "/boot/config.txt"
+    
+    print(f"Updating boot configuration: {config_path}")
+    
+    try:
+        # Read the current content
+        success, content = run_command(f"cat {config_path}", sudo=True)
+        if not success:
+            print(f"Error: Could not read {config_path}")
+            return False
+        
+        # Process the lines
+        new_lines = []
+        dwc2_line_found = False
+        
+        for line in content.splitlines():
+            # Comment out the dtoverlay=dwc2,dr_mode=host line
+            if "dtoverlay=dwc2,dr_mode=host" in line and not line.strip().startswith('#'):
+                new_lines.append(f"#{line}")
+                dwc2_line_found = True
+            else:
+                new_lines.append(line)
+        
+        # Add the new configuration lines
+        new_lines.append("otg_mode=1")
+        new_lines.append("dtparam=usb_pwr_en")
+        new_lines.append("max_usb_current=1")
+        
+        # Create the new content
+        new_content = "\n".join(new_lines)
+        
+        # Create a temporary file
+        temp_file = "/tmp/config.txt.new"
+        with open(temp_file, 'w') as file:
+            file.write(new_content)
+        
+        # Move the temporary file to the actual location
+        move_success, _ = run_command(f"mv {temp_file} {config_path}", sudo=True)
+        if not move_success:
+            print(f"Error: Could not update {config_path}")
+            return False
+        
+        print(f"Boot configuration updated successfully:")
+        if dwc2_line_found:
+            print("- Commented out 'dtoverlay=dwc2,dr_mode=host'")
+        else:
+            print("- Note: 'dtoverlay=dwc2,dr_mode=host' was not found in the config")
+        print("- Added 'otg_mode=1'")
+        print("- Added USB power parameters")
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error updating boot configuration: {str(e)}")
+        return False
+
+
+def reboot_system() -> bool:
+    """
+    Reboot the Raspberry Pi system.
+    
+    Returns:
+        bool: True if the reboot command was executed successfully
+    """
+    print("Preparing to reboot the system...")
+    
+    try:
+        # Execute the reboot command
+        success, _ = run_command("reboot", sudo=True)
+        if not success:
+            print("Error: Failed to reboot the system")
+            return False
+        
+        print("Reboot command executed successfully. System will restart now.")
+        return True
+        
+    except Exception as e:
+        print(f"Error during reboot: {str(e)}")
+        return False
 
 
 def update_system_services() -> bool:
@@ -408,6 +503,8 @@ def main():
     print("6. Truncate log files")
     print("7. Update system services")
     print("8. Start control service")
+    print("9. Update boot configuration (/boot/config.txt)")
+    print("10. Reboot system")
     
     proceed = input("\nDo you want to proceed with system update? (y/n): ")
     if proceed.lower() != 'y':
@@ -417,12 +514,25 @@ def main():
     # Perform system update
     system_update_success = perform_system_update()
     
+    # Update boot configuration
+    print("\n-- Updating Boot Configuration --")
+    boot_config_success = update_boot_config()
+    if not boot_config_success:
+        print("Warning: Boot configuration update failed")
+        system_update_success = False
+    
     if system_update_success:
         print("\nSystem update completed successfully.")
     else:
         print("\nSystem update completed with some warnings or errors.")
     
-    print("\nUpdate process completed. System has been updated.")
+    # Ask if user wants to reboot now
+    reboot_now = input("\nDo you want to reboot the system now? (y/n): ")
+    if reboot_now.lower() == 'y':
+        print("\nRebooting the system...")
+        reboot_system()
+    else:
+        print("\nUpdate process completed. Please reboot the system manually to apply all changes.")
 
 
 if __name__ == "__main__":
