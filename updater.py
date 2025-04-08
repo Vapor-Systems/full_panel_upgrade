@@ -5,8 +5,8 @@ Configuration Update Tool
 This script performs a complete update of the system:
 1. Updates configuration values:
    - Device name in vst_secrets.py
-   - Run cycle count in runcycles.json
-   - Profile in profile.json
+   - Run cycle count in runcycles.json (copied from existing if available)
+   - Profile in profile.json (copied from existing if available)
    - RPI serial number (last 6 digits) in startup.json
 2. Performs system operations:
    - Removes backup directory
@@ -26,6 +26,7 @@ import re
 import subprocess
 import sys
 import time
+import shutil
 from typing import Callable, List, Optional, Tuple
 
 
@@ -164,6 +165,38 @@ def update_file_with_value(
         
     except Exception as e:
         print(f"Error updating file: {str(e)}")
+        return False
+
+
+def copy_file_if_exists(source_path: str, destination_path: str) -> bool:
+    """
+    Copy a file from source to destination if it exists.
+    
+    Args:
+        source_path: Source file path
+        destination_path: Destination file path
+        
+    Returns:
+        bool: True if file was copied or doesn't exist, False if copy failed
+    """
+    if not os.path.exists(source_path):
+        print(f"File '{source_path}' does not exist. Prompting for input instead.")
+        return False
+    
+    try:
+        shutil.copy2(source_path, destination_path)
+        
+        # Read the content to display what was copied
+        try:
+            with open(source_path, 'r') as file:
+                content = file.read().strip()
+                print(f"Copied from existing file: {content}")
+        except Exception:
+            print(f"Copied from existing file. (Content could not be displayed)")
+        
+        return True
+    except Exception as e:
+        print(f"Error copying file: {str(e)}")
         return False
 
 
@@ -447,39 +480,41 @@ def main():
     if os.geteuid() != 0:
         print("Note: Some operations require sudo privileges. You may be prompted for your password.")
     
-    # Define the files and update operations for user input
-    operations = [
-        {
-            "title": "Updating Device Name",
-            "file_path": "python.new/vst_secrets.py",
-            "prompt": "Enter new device name: ",
-            "function": update_device_name_content,
-            "validator": None
-        },
-        {
-            "title": "Updating Run Cycle Count",
-            "file_path": "python.new/runcycles.json",
-            "prompt": "Enter new run cycle count: ",
-            "function": update_simple_value,
-            "validator": validate_number
-        },
-        {
-            "title": "Updating Profile",
-            "file_path": "python.new/profile.json",
-            "prompt": "Enter new profile value: ",
-            "function": update_simple_value,
-            "validator": None
-        }
-    ]
+    # First, update the device name
+    print("\n-- Updating Device Name --")
+    update_file(
+        "python.new/vst_secrets.py",
+        "Enter new device name: ",
+        update_device_name_content
+    )
     
-    # Execute each configuration operation
-    for op in operations:
-        print(f"\n-- {op['title']} --")
+    # Check if runcycles.json exists in the current python folder and copy it if it does
+    print("\n-- Checking for existing Run Cycle Count --")
+    source_runcycles = "/home/pi/python/runcycles.json"
+    target_runcycles = "python.new/runcycles.json"
+    
+    if not copy_file_if_exists(source_runcycles, target_runcycles):
+        # If copying failed, prompt for new value
+        print("\n-- Updating Run Cycle Count --")
         update_file(
-            op["file_path"],
-            op["prompt"],
-            op["function"],
-            op["validator"]
+            target_runcycles,
+            "Enter new run cycle count: ",
+            update_simple_value,
+            validate_number
+        )
+    
+    # Check if profile.json exists in the current python folder and copy it if it does
+    print("\n-- Checking for existing Profile --")
+    source_profile = "/home/pi/python/profile.json"
+    target_profile = "python.new/profile.json"
+    
+    if not copy_file_if_exists(source_profile, target_profile):
+        # If copying failed, prompt for new value
+        print("\n-- Updating Profile --")
+        update_file(
+            target_profile,
+            "Enter new profile value: ",
+            update_simple_value
         )
     
     # Handle the Raspberry Pi serial number
