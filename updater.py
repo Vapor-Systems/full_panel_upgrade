@@ -75,55 +75,37 @@ def check_file_exists(file_path: str) -> bool:
     return True
 
 
-def update_file(
-    file_path: str,
-    prompt: str,
-    update_function: Callable[[str, str], Optional[str]],
-    validator: Optional[Callable[[str], bool]] = None
-) -> bool:
+
+def extract_device_name_from_original() -> Tuple[bool, str]:
     """
-    Generic function to update a file based on user input.
+    Extract the device name from the original vst_secrets.py file.
     
-    Args:
-        file_path: Path to the file to update
-        prompt: Text to display when asking for user input
-        update_function: Function that takes the file content and user input and returns updated content
-        validator: Optional function to validate user input
-        
     Returns:
-        bool: True if update was successful, False otherwise
+        Tuple[bool, str]: Success status and device name
     """
-    if not check_file_exists(file_path):
-        return False
+    original_file = "/home/pi/python/vst_secrets.py"
+    
+    if not os.path.exists(original_file):
+        print(f"Warning: Original file '{original_file}' not found.")
+        return False, ""
     
     try:
-        # Get user input
-        user_input = input(prompt)
-        
-        # Validate input if a validator was provided
-        if validator and not validator(user_input):
-            return False
-        
-        # Read current content if needed by the update function
-        try:
-            with open(file_path, 'r') as file:
-                current_content = file.read()
-        except UnicodeDecodeError:
-            current_content = ""
-        
-        # Get updated content
-        updated_content = update_function(current_content, user_input)
-        
-        # Write updated content
-        with open(file_path, 'w') as file:
-            file.write(updated_content)
-        
-        print(f"Updated successfully to: {user_input}")
-        return True
+        with open(original_file, 'r') as file:
+            content = file.read()
+            
+        # Extract device name using regex
+        match = re.search(r'"DEVICE_NAME"\s*:\s*"([^"]*)"', content)
+        if not match:
+            print("Error: Could not extract device name from original file.")
+            return False, ""
+            
+        device_name = match.group(1)
+        print(f"Extracted device name from original file: {device_name}")
+        return True, device_name
         
     except Exception as e:
-        print(f"Error updating file: {str(e)}")
-        return False
+        print(f"Error reading original vst_secrets.py: {str(e)}")
+        return False, ""
 
 
 def update_file_with_value(
@@ -480,42 +462,64 @@ def main():
     if os.geteuid() != 0:
         print("Note: Some operations require sudo privileges. You may be prompted for your password.")
     
-    # First, update the device name
+    # First, update the device name by extracting from original file
     print("\n-- Updating Device Name --")
-    update_file(
-        "python.new/vst_secrets.py",
-        "Enter new device name: ",
-        update_device_name_content
-    )
+    success, device_name = extract_device_name_from_original()
     
-    # Check if runcycles.json exists in the current python folder and copy it if it does
-    print("\n-- Checking for existing Run Cycle Count --")
-    source_runcycles = "/home/pi/python/runcycles.json"
+    if success and device_name:
+        update_file_with_value(
+            "python.new/vst_secrets.py",
+            device_name,
+            update_device_name_content
+        )
+    else:
+        # Use default name if original not found
+        print("Could not extract device name from original file. Using default 'CSX-0'.")
+        update_file_with_value(
+            "python.new/vst_secrets.py",
+            "CSX-0",
+            update_device_name_content
+        )
+    
+    # Check if runcycles.json already exists in the target folder
     target_runcycles = "python.new/runcycles.json"
+    if not os.path.exists(target_runcycles):
+        # Check if runcycles.json exists in the current python folder and copy it if it does
+        print("\n-- Checking for existing Run Cycle Count --")
+        source_runcycles = "/home/pi/python/runcycles.json"
+        if not copy_file_if_exists(source_runcycles, target_runcycles):
+            # Create default runcycles.json with value "0" if not found
+            print("Creating default runcycles.json with value '0'")
+            with open(target_runcycles, 'w') as file:
+                file.write('"0"')
+    else:
+        print(f"\n-- Using existing Run Cycle Count file --")
+        try:
+            with open(target_runcycles, 'r') as file:
+                content = file.read().strip()
+                print(f"Using existing run cycle count: {content}")
+        except Exception:
+            print("Using existing run cycle count file. (Content could not be displayed)")
     
-    if not copy_file_if_exists(source_runcycles, target_runcycles):
-        # If copying failed, prompt for new value
-        print("\n-- Updating Run Cycle Count --")
-        update_file(
-            target_runcycles,
-            "Enter new run cycle count: ",
-            update_simple_value,
-            validate_number
-        )
-    
-    # Check if profile.json exists in the current python folder and copy it if it does
-    print("\n-- Checking for existing Profile --")
-    source_profile = "/home/pi/python/profile.json"
+    # Check if profile.json already exists in the target folder
     target_profile = "python.new/profile.json"
-    
-    if not copy_file_if_exists(source_profile, target_profile):
-        # If copying failed, prompt for new value
-        print("\n-- Updating Profile --")
-        update_file(
-            target_profile,
-            "Enter new profile value: ",
-            update_simple_value
-        )
+    if not os.path.exists(target_profile):
+        # Check if profile.json exists in the current python folder and copy it if it does
+        print("\n-- Checking for existing Profile --")
+        source_profile = "/home/pi/python/profile.json"
+        if not copy_file_if_exists(source_profile, target_profile):
+            # Create default profile.json with value "CS2" if not found
+            print("Creating default profile.json with value 'CS2'")
+            with open(target_profile, 'w') as file:
+                file.write('"CS2"')
+    else:
+        print(f"\n-- Using existing Profile file --")
+        try:
+            with open(target_profile, 'r') as file:
+                content = file.read().strip()
+                print(f"Using existing profile: {content}")
+        except Exception:
+            print("Using existing profile file. (Content could not be displayed)")
     
     # Handle the Raspberry Pi serial number
     print("\n-- Updating Startup with Raspberry Pi Serial --")
@@ -527,7 +531,7 @@ def main():
             update_simple_value
         )
     
-    # Confirm before proceeding with system update
+    # Print informational message about system update operations
     print("\n=== System Update Operations ===")
     print("The following operations will be performed:")
     print("1. Remove backup directory: /home/pi/python.bak")
@@ -540,11 +544,6 @@ def main():
     print("8. Start control service")
     print("9. Update boot configuration (/boot/config.txt)")
     print("10. Reboot system")
-    
-    proceed = input("\nDo you want to proceed with system update? (y/n): ")
-    if proceed.lower() != 'y':
-        print("System update cancelled. Configuration changes have been applied.")
-        return
     
     # Perform system update
     system_update_success = perform_system_update()
@@ -561,13 +560,9 @@ def main():
     else:
         print("\nSystem update completed with some warnings or errors.")
     
-    # Ask if user wants to reboot now
-    reboot_now = input("\nDo you want to reboot the system now? (y/n): ")
-    if reboot_now.lower() == 'y':
-        print("\nRebooting the system...")
-        reboot_system()
-    else:
-        print("\nUpdate process completed. Please reboot the system manually to apply all changes.")
+    # Automatically reboot
+    print("\nRebooting the system...")
+    reboot_system()
 
 
 if __name__ == "__main__":
