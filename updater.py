@@ -28,7 +28,6 @@ import subprocess
 import sys
 import time
 import shutil
-from typing import Callable, List, Optional, Tuple, Literal
 
 # Configuration template for Compute Module 3
 CM3_CONFIG = """
@@ -114,7 +113,7 @@ max_usb_current=1
 """
 
 
-def run_command(command: str, sudo: bool = False) -> Tuple[bool, str]:
+def run_command(command, sudo = False):
     """
     Run a shell command and return the result.
     
@@ -123,7 +122,7 @@ def run_command(command: str, sudo: bool = False) -> Tuple[bool, str]:
         sudo: Whether to run the command with sudo
         
     Returns:
-        Tuple[bool, str]: Success status and command output
+        A tuple containing (success status, command output)
     """
     try:
         if sudo and os.geteuid() != 0:
@@ -151,12 +150,12 @@ def run_command(command: str, sudo: bool = False) -> Tuple[bool, str]:
         return False, str(e)
 
 
-def get_raspberry_pi_model() -> Literal["CM3", "CM4", "OTHER"]:
+def get_raspberry_pi_model():
     """
     Determine the Raspberry Pi model by checking hardware information.
     
     Returns:
-        Literal["CM3", "CM4", "OTHER"]: The Raspberry Pi model
+        The Raspberry Pi model: "CM3", "CM4", or "OTHER"
     """
     try:
         success, model_info = run_command("cat /proc/cpuinfo | grep Model")
@@ -183,7 +182,7 @@ def get_raspberry_pi_model() -> Literal["CM3", "CM4", "OTHER"]:
         return "OTHER"
 
 
-def check_file_exists(file_path: str) -> bool:
+def check_file_exists(file_path):
     """Check if a file exists and print an error if it doesn't."""
     if not os.path.exists(file_path):
         print(f"Error: File '{file_path}' does not exist.")
@@ -191,12 +190,12 @@ def check_file_exists(file_path: str) -> bool:
     return True
 
 
-def extract_device_name_from_original() -> Tuple[bool, str]:
+def extract_device_name_from_original():
     """
     Extract the device name from the original vst_secrets.py file.
     
     Returns:
-        Tuple[bool, str]: Success status and device name
+        A tuple containing (success status, device name)
     """
     original_file = "/home/pi/python/vst_secrets.py"
     
@@ -224,10 +223,10 @@ def extract_device_name_from_original() -> Tuple[bool, str]:
 
 
 def update_file_with_value(
-    file_path: str,
-    value: str,
-    update_function: Callable[[str, str], str]
-) -> bool:
+    file_path,
+    value,
+    update_function
+):
     """
     Update a file with a specific value without user input.
     
@@ -237,7 +236,7 @@ def update_file_with_value(
         update_function: Function that takes the file content and value and returns updated content
         
     Returns:
-        bool: True if update was successful, False otherwise
+        True if update was successful, False otherwise
     """
     if not check_file_exists(file_path):
         return False
@@ -265,7 +264,7 @@ def update_file_with_value(
         return False
 
 
-def copy_file_if_exists(source_path: str, destination_path: str) -> bool:
+def copy_file_if_exists(source_path, destination_path):
     """
     Copy a file from source to destination if it exists.
     
@@ -274,7 +273,7 @@ def copy_file_if_exists(source_path: str, destination_path: str) -> bool:
         destination_path: Destination file path
         
     Returns:
-        bool: True if file was copied or doesn't exist, False if copy failed
+        True if file was copied or doesn't exist, False if copy failed
     """
     if not os.path.exists(source_path):
         print(f"File '{source_path}' does not exist. Prompting for input instead.")
@@ -297,7 +296,7 @@ def copy_file_if_exists(source_path: str, destination_path: str) -> bool:
         return False
 
 
-def validate_number(value: str) -> bool:
+def validate_number(value):
     """Validate that input is a number."""
     try:
         int(value)
@@ -307,7 +306,7 @@ def validate_number(value: str) -> bool:
         return False
 
 
-def update_device_name_content(content: str, new_name: str) -> str:
+def update_device_name_content(content, new_name):
     """Update the device name in the content string."""
     return re.sub(
         r'("DEVICE_NAME"\s*:\s*")([^"]*)(")',
@@ -316,17 +315,17 @@ def update_device_name_content(content: str, new_name: str) -> str:
     )
 
 
-def update_simple_value(content: str, new_value: str) -> str:
+def update_simple_value(content, new_value):
     """Update a simple value in quotes."""
     return f'"{new_value}"'
 
 
-def get_rpi_serial() -> Tuple[bool, str]:
+def get_rpi_serial():
     """
     Get the Raspberry Pi serial number from /proc/cpuinfo.
     
     Returns:
-        Tuple[bool, str]: Success status and serial number (last 6 digits, uppercase)
+        A tuple containing (success status, serial number (last 6 digits, uppercase))
     """
     success, output = run_command("cat /proc/cpuinfo | grep Serial")
     if not success or not output:
@@ -346,7 +345,7 @@ def get_rpi_serial() -> Tuple[bool, str]:
     return True, last_six
 
 
-def update_boot_config_cm4() -> bool:
+def update_boot_config_cm4():
     """
     Update the boot configuration in /boot/config.txt for Compute Module 4:
     - Comment out 'dtoverlay=dwc2,dr_mode=host'
@@ -354,7 +353,7 @@ def update_boot_config_cm4() -> bool:
     - Add USB power parameters
     
     Returns:
-        bool: True if the update was successful, False otherwise
+        True if the update was successful, False otherwise
     """
     config_path = "/boot/config.txt"
     
@@ -413,13 +412,13 @@ def update_boot_config_cm4() -> bool:
         return False
 
 
-def update_boot_config_cm3() -> bool:
+def update_boot_config_cm3():
     """
     Update the boot configuration in /boot/config.txt for Compute Module 3.
     Verifies and ensures the configuration matches the required CM3 configuration.
     
     Returns:
-        bool: True if the update was successful, False otherwise
+        True if the update was successful, False otherwise
     """
     config_path = "/boot/config.txt"
     
@@ -445,12 +444,12 @@ def update_boot_config_cm3() -> bool:
         return False
 
 
-def update_boot_config() -> bool:
+def update_boot_config():
     """
     Update the boot configuration based on the Raspberry Pi model.
     
     Returns:
-        bool: True if the update was successful, False otherwise
+        True if the update was successful, False otherwise
     """
     model = get_raspberry_pi_model()
     
@@ -463,12 +462,12 @@ def update_boot_config() -> bool:
         return False
 
 
-def reboot_system() -> bool:
+def reboot_system():
     """
     Reboot the Raspberry Pi system.
     
     Returns:
-        bool: True if the reboot command was executed successfully
+        True if the reboot command was executed successfully
     """
     print("Preparing to reboot the system...")
     
@@ -487,12 +486,12 @@ def reboot_system() -> bool:
         return False
 
 
-def update_system_services() -> bool:
+def update_system_services():
     """
     Update system services using files from the 'services' directory.
     
     Returns:
-        bool: True if all services were updated successfully, False otherwise
+        True if all services were updated successfully, False otherwise
     """
     src_dir = "services"
     target_dir = "/etc/systemd/system"
@@ -548,12 +547,12 @@ def update_system_services() -> bool:
     return success
 
 
-def perform_system_update() -> bool:
+def perform_system_update():
     """
     Perform the system update operations.
     
     Returns:
-        bool: True if all operations were successful, False otherwise
+        True if all operations were successful, False otherwise
     """
     operations = [
         {
@@ -653,25 +652,21 @@ def main():
             update_device_name_content
         )
     
-    # Check if runcycles.json already exists in the target folder
+    # Always try to copy from the original, regardless if target already exists
+    print("\n-- Copying Run Cycle Count from original --")
     target_runcycles = "python.new/runcycles.json"
-    if not os.path.exists(target_runcycles):
-        # Check if runcycles.json exists in the current python folder and copy it if it does
-        print("\n-- Checking for existing Run Cycle Count --")
-        source_runcycles = "/home/pi/python/runcycles.json"
-        if not copy_file_if_exists(source_runcycles, target_runcycles):
-            # Create default runcycles.json with value "0" if not found
-            print("Creating default runcycles.json with value '0'")
-            with open(target_runcycles, 'w') as file:
-                file.write('"0"')
-    else:
-        print(f"\n-- Using existing Run Cycle Count file --")
-        try:
-            with open(target_runcycles, 'r') as file:
-                content = file.read().strip()
-                print(f"Using existing run cycle count: {content}")
-        except Exception:
-            print("Using existing run cycle count file. (Content could not be displayed)")
+    source_runcycles = "/home/pi/python/runcycles.json"
+    
+    # Remove any existing file in the target directory first
+    if os.path.exists(target_runcycles):
+        os.remove(target_runcycles)
+    
+    # Try to copy from original
+    if not copy_file_if_exists(source_runcycles, target_runcycles):
+        # Create default runcycles.json with value "0" if original not found
+        print("Original run cycles not found. Creating default with value '0'")
+        with open(target_runcycles, 'w') as file:
+            file.write('"0"')
     
     # Check if profile.json already exists in the target folder
     target_profile = "python.new/profile.json"
