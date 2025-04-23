@@ -16,9 +16,10 @@ This script performs a complete update of the system:
    - Moves new code into place
    - Updates and starts system services
 3. Updates boot configuration:
-   - Modifies /boot/config.txt to set USB parameters
-   - Comments out dwc2 host mode
-   - Adds otg_mode and USB power settings
+   - For Compute Module 4: Modifies /boot/config.txt to set USB parameters,
+     comments out dwc2 host mode, adds otg_mode and USB power settings
+   - For Compute Module 3: Verifies and updates configuration as needed
+   - For other models: Exits with error
 """
 
 import os
@@ -27,7 +28,90 @@ import subprocess
 import sys
 import time
 import shutil
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple, Literal
+
+# Configuration template for Compute Module 3
+CM3_CONFIG = """
+# For more options and information see
+# http://www.raspberrypi.org/documentation/configuration/config-txt.md
+# Some settings may impact device functionality. See link above for details
+
+# uncomment if you get no picture on HDMI for a default "safe" mode
+#hdmi_safe=1
+
+# uncomment this if your display has a black border of unused pixels visible
+# and your display can output without overscan
+#disable_overscan=1
+
+# uncomment the following to adjust overscan. Use positive numbers if console
+# goes off screen, and negative if there is too much border
+#overscan_left=16
+#overscan_right=16
+#overscan_top=16
+#overscan_bottom=16
+
+# uncomment to force a console size. By default it will be display's size minus
+# overscan.
+#framebuffer_width=1280
+#framebuffer_height=720
+
+# uncomment if hdmi display is not detected and composite is being output
+hdmi_force_hotplug=1
+
+# uncomment to force a specific HDMI mode (this will force VGA)
+#hdmi_group=1
+#hdmi_mode=1
+hdmi_group=2
+hdmi_mode=87
+hdmi_cvt 800 480 60 6 0 0 0
+
+# uncomment to force a HDMI mode rather than DVI. This can make audio work in
+# DMT (computer monitor) modes
+#hdmi_drive=2
+
+# uncomment to increase signal to HDMI, if you have interference, blanking, or
+# no display
+#config_hdmi_boost=4
+
+# uncomment for composite PAL
+#sdtv_mode=2
+
+#uncomment to overclock the arm. 700 MHz is the default.
+#arm_freq=800
+
+# Uncomment some or all of these to enable the optional hardware interfaces
+dtparam=i2c_arm=on
+#dtparam=i2s=on
+dtparam=spi=on
+# dtparam=i2c2_iknowwhatimdoing
+dtparam=uart0=on
+dtparam=i2c_baudrate=400000
+# Uncomment this to enable the lirc-rpi module
+#dtoverlay=lirc-rpi
+
+# Additional overlays and parameters are documented /boot/overlays/README
+enable_uart=1
+dtoverlay=uart1,txd1_pin=32,rxd1_pin=33
+core_freq=250
+#dtoverlay=i2c-gpio,i2c_gpio_sda=0,i2c_gpio_scl=1
+dtoverlay=pwm-2chan,pin=40,func=4,pin2=41,func2=4
+dtoverlay=i2c-rtc,ds3231
+
+# Enable audio (loads snd_bcm2835)
+dtparam=audio=on
+
+desired_osc_freq=3700000
+
+loglevels=1
+avoid_warnings=1
+disable_splash=1
+dtoverlay=w1-gpio
+display_lcd_rotate=2
+display_hdmi_rotate=2
+#dtparam=watchdog=on
+dtparam=usb_pwr_en
+max_usb_current=1
+"""
 
 
 def run_command(command: str, sudo: bool = False) -> Tuple[bool, str]:
@@ -67,13 +151,44 @@ def run_command(command: str, sudo: bool = False) -> Tuple[bool, str]:
         return False, str(e)
 
 
+def get_raspberry_pi_model() -> Literal["CM3", "CM4", "OTHER"]:
+    """
+    Determine the Raspberry Pi model by checking hardware information.
+    
+    Returns:
+        Literal["CM3", "CM4", "OTHER"]: The Raspberry Pi model
+    """
+    try:
+        success, model_info = run_command("cat /proc/cpuinfo | grep Model")
+        if not success or not model_info:
+            print("Warning: Could not determine Raspberry Pi model.")
+            return "OTHER"
+        
+        # Check for Compute Module 4
+        if "Compute Module 4" in model_info:
+            print("Detected Raspberry Pi Compute Module 4")
+            return "CM4"
+        
+        # Check for Compute Module 3
+        if "Compute Module 3" in model_info or "Compute Module 3+" in model_info:
+            print("Detected Raspberry Pi Compute Module 3")
+            return "CM3"
+        
+        # If we get here, it's some other model
+        print(f"Detected Raspberry Pi model: {model_info}")
+        return "OTHER"
+        
+    except Exception as e:
+        print(f"Error detecting Raspberry Pi model: {str(e)}")
+        return "OTHER"
+
+
 def check_file_exists(file_path: str) -> bool:
     """Check if a file exists and print an error if it doesn't."""
     if not os.path.exists(file_path):
         print(f"Error: File '{file_path}' does not exist.")
         return False
     return True
-
 
 
 def extract_device_name_from_original() -> Tuple[bool, str]:
@@ -231,9 +346,9 @@ def get_rpi_serial() -> Tuple[bool, str]:
     return True, last_six
 
 
-def update_boot_config() -> bool:
+def update_boot_config_cm4() -> bool:
     """
-    Update the boot configuration in /boot/config.txt:
+    Update the boot configuration in /boot/config.txt for Compute Module 4:
     - Comment out 'dtoverlay=dwc2,dr_mode=host'
     - Add 'otg_mode=1'
     - Add USB power parameters
@@ -243,7 +358,7 @@ def update_boot_config() -> bool:
     """
     config_path = "/boot/config.txt"
     
-    print(f"Updating boot configuration: {config_path}")
+    print(f"Updating boot configuration for CM4: {config_path}")
     
     try:
         # Read the current content
@@ -283,7 +398,7 @@ def update_boot_config() -> bool:
             print(f"Error: Could not update {config_path}")
             return False
         
-        print(f"Boot configuration updated successfully:")
+        print(f"Boot configuration for CM4 updated successfully:")
         if dwc2_line_found:
             print("- Commented out 'dtoverlay=dwc2,dr_mode=host'")
         else:
@@ -295,6 +410,56 @@ def update_boot_config() -> bool:
         
     except Exception as e:
         print(f"Error updating boot configuration: {str(e)}")
+        return False
+
+
+def update_boot_config_cm3() -> bool:
+    """
+    Update the boot configuration in /boot/config.txt for Compute Module 3.
+    Verifies and ensures the configuration matches the required CM3 configuration.
+    
+    Returns:
+        bool: True if the update was successful, False otherwise
+    """
+    config_path = "/boot/config.txt"
+    
+    print(f"Updating boot configuration for CM3: {config_path}")
+    
+    try:
+        # Create a temporary file with the CM3 configuration
+        temp_file = "/tmp/config.txt.new"
+        with open(temp_file, 'w') as file:
+            file.write(CM3_CONFIG)
+        
+        # Move the temporary file to the actual location
+        move_success, _ = run_command(f"mv {temp_file} {config_path}", sudo=True)
+        if not move_success:
+            print(f"Error: Could not update {config_path}")
+            return False
+        
+        print(f"Boot configuration for CM3 updated successfully with required configuration")
+        return True
+        
+    except Exception as e:
+        print(f"Error updating boot configuration for CM3: {str(e)}")
+        return False
+
+
+def update_boot_config() -> bool:
+    """
+    Update the boot configuration based on the Raspberry Pi model.
+    
+    Returns:
+        bool: True if the update was successful, False otherwise
+    """
+    model = get_raspberry_pi_model()
+    
+    if model == "CM4":
+        return update_boot_config_cm4()
+    elif model == "CM3":
+        return update_boot_config_cm3()
+    else:
+        print("Error: Cannot update boot configuration - this script only supports Compute Module 3 and 4")
         return False
 
 
@@ -462,6 +627,13 @@ def main():
     if os.geteuid() != 0:
         print("Note: Some operations require sudo privileges. You may be prompted for your password.")
     
+    # First, check the Raspberry Pi model
+    model = get_raspberry_pi_model()
+    if model not in ["CM3", "CM4"]:
+        print("\nERROR: This update tool only works on Raspberry Pi Compute Module 3 or 4.")
+        print("Current device is not a supported model.")
+        sys.exit(1)
+    
     # First, update the device name by extracting from original file
     print("\n-- Updating Device Name --")
     success, device_name = extract_device_name_from_original()
@@ -542,14 +714,14 @@ def main():
     print("6. Truncate log files")
     print("7. Update system services")
     print("8. Start control service")
-    print("9. Update boot configuration (/boot/config.txt)")
+    print(f"9. Update boot configuration (/boot/config.txt) for {model}")
     print("10. Reboot system")
     
     # Perform system update
     system_update_success = perform_system_update()
     
     # Update boot configuration
-    print("\n-- Updating Boot Configuration --")
+    print(f"\n-- Updating Boot Configuration for {model} --")
     boot_config_success = update_boot_config()
     if not boot_config_success:
         print("Warning: Boot configuration update failed")
