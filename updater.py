@@ -668,25 +668,21 @@ def main():
         with open(target_runcycles, 'w') as file:
             file.write('"0"')
     
-    # Check if profile.json already exists in the target folder
-    target_profile = "python.new/profile.json"
-    if not os.path.exists(target_profile):
-        # Check if profile.json exists in the current python folder and copy it if it does
-        print("\n-- Checking for existing Profile --")
-        source_profile = "/home/pi/python/profile.json"
-        if not copy_file_if_exists(source_profile, target_profile):
-            # Create default profile.json with value "CS2" if not found
-            print("Creating default profile.json with value 'CS2'")
-            with open(target_profile, 'w') as file:
-                file.write('"CS2"')
-    else:
-        print(f"\n-- Using existing Profile file --")
-        try:
-            with open(target_profile, 'r') as file:
-                content = file.read().strip()
-                print(f"Using existing profile: {content}")
-        except Exception:
-            print("Using existing profile file. (Content could not be displayed)")
+   source_profile = "python/profile.json"
+   target_profile = "python.new/profile.json"
+   
+   # Always try to copy profile.json from python to python.new
+   print("\n-- Copying Profile --")
+   if os.path.exists(source_profile):
+       os.makedirs(os.path.dirname(target_profile), exist_ok=True)
+       shutil.copy2(source_profile, target_profile)
+       print(f"Copied profile from {source_profile} to {target_profile}")
+   else:
+       # If source doesn't exist, create default in target
+       print(f"{source_profile} not found. Creating default profile in {target_profile} with value 'CS2'")
+       os.makedirs(os.path.dirname(target_profile), exist_ok=True)
+       with open(target_profile, 'w') as file:
+           file.write('"CS8"')
     
     # Handle the Raspberry Pi serial number
     print("\n-- Updating Startup with Raspberry Pi Serial --")
