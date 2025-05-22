@@ -645,10 +645,10 @@ def main():
         )
     else:
         # Use default name if original not found
-        print("Could not extract device name from original file. Using default 'CSX-0'.")
+        print("Could not extract device name from original file. Using default 'CSX-0000'.")
         update_file_with_value(
             "python.new/vst_secrets.py",
-            "CSX-0",
+            "CSX-0000",
             update_device_name_content
         )
     
