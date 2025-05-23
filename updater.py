@@ -668,7 +668,7 @@ def main():
         with open(target_runcycles, 'w') as file:
             file.write('"0"')
     
-    source_profile = "python/profile.json"
+    source_profile = "/home/pi/python/profile.json"
     target_profile = "python.new/profile.json"
 
     # Always try to copy profile.json from python to python.new
